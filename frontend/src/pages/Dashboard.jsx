@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { DashboardLayout } from '../components/DashboardLayout'
 import { UploadModal } from '../components/UploadModal'
 import { listVideos } from '../lib/api'
-import { Upload, Video, Clock, CheckCircle, AlertCircle, Loader } from 'lucide-react'
+import { Upload, Video, Clock, CheckCircle, AlertCircle, Loader, RefreshCw } from 'lucide-react'
 
 export function Dashboard() {
   const { user } = useAuth()
@@ -29,13 +29,6 @@ export function Dashboard() {
   useEffect(() => {
     if (user?.id) {
       fetchVideos()
-      
-      // Auto-refresh every 10 seconds to check processing status
-      const interval = setInterval(() => {
-        fetchVideos()
-      }, 10000)
-      
-      return () => clearInterval(interval)
     }
   }, [user?.id])
 
@@ -89,36 +82,29 @@ export function Dashboard() {
               {videos.length} video{videos.length !== 1 ? 's' : ''} uploaded
             </p>
           </div>
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Upload size={20} />
-            Upload Video
-          </button>
-        </div>
-
-        {/* Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-            <h3 className="font-medium text-gray-900 mb-2">✅ Authentication</h3>
-            <p className="text-sm text-gray-600">
-              User ID: <code className="bg-gray-100 px-2 py-1 rounded text-xs">{user?.id?.slice(0, 8)}...</code>
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-            <h3 className="font-medium text-gray-900 mb-2">📡 Backend API</h3>
-            <p className="text-sm text-gray-600">
-              <code className="bg-gray-100 px-2 py-1 rounded text-xs">localhost:8000</code>
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-            <h3 className="font-medium text-gray-900 mb-2">🎬 Videos</h3>
-            <p className="text-sm text-gray-600">
-              {videos.filter(v => v.status === 'ready').length} ready to search
-            </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchVideos}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-3 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
+              style={{ backgroundColor: 'white' }}
+              onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = '#e9ecef')}
+              onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = 'white')}
+              title="Refresh video list"
+            >
+              <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-medium transition-colors shadow-sm"
+              style={{ backgroundColor: '#83c5be' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6fb3aa'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#83c5be'}
+            >
+              <Upload size={20} />
+              Upload Video
+            </button>
           </div>
         </div>
 
@@ -147,14 +133,17 @@ export function Dashboard() {
               </p>
               <button
                 onClick={() => setIsUploadModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
+                style={{ backgroundColor: '#83c5be' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6fb3aa'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#83c5be'}
               >
                 <Upload size={18} />
                 Upload Video
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
               {videos.map((video) => {
                 const status = getStatusBadge(video.status)
                 const StatusIcon = status.icon
@@ -162,34 +151,54 @@ export function Dashboard() {
                 return (
                   <div
                     key={video.id}
-                    className="p-6 hover:bg-gray-50 transition-colors"
+                    className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-medium text-gray-900">
-                            Video {video.id.slice(0, 8)}...
-                          </h4>
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.class}`}>
-                            <StatusIcon size={14} />
-                            {status.text}
-                          </span>
+                    {/* Thumbnail */}
+                    <div className="relative bg-gray-900 aspect-video">
+                      {video.thumbnail_url ? (
+                        <img 
+                          src={video.thumbnail_url} 
+                          alt={`Video ${video.id.slice(0, 8)}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Video size={48} className="text-gray-600" />
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <span>📅 {formatDate(video.created_at)}</span>
-                          {video.duration_ms && (
-                            <span>⏱️ {formatDuration(video.duration_ms)}</span>
-                          )}
-                          {video.width && video.height && (
-                            <span>📐 {video.width}x{video.height}</span>
-                          )}
+                      )}
+                      
+                      {/* Status Badge on Thumbnail */}
+                      <div className="absolute top-2 right-2">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.class} shadow-sm`}>
+                          <StatusIcon size={14} />
+                          {status.text}
+                        </span>
+                      </div>
+                      
+                      {/* Duration on Thumbnail */}
+                      {video.duration_ms && (
+                        <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 px-2 py-1 rounded text-xs font-medium text-white">
+                          {formatDuration(video.duration_ms)}
                         </div>
-                        {video.error_msg && (
-                          <p className="mt-2 text-sm text-red-600">
-                            Error: {video.error_msg}
-                          </p>
+                      )}
+                    </div>
+                    
+                    {/* Video Info */}
+                    <div className="p-4">
+                      <h4 className="font-medium text-gray-900 mb-2 truncate">
+                        Video {video.id.slice(0, 8)}...
+                      </h4>
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <span>📅 {formatDate(video.created_at)}</span>
+                        {video.width && video.height && (
+                          <span>📐 {video.width}x{video.height}</span>
                         )}
                       </div>
+                      {video.error_msg && (
+                        <p className="mt-2 text-xs text-red-600 line-clamp-2">
+                          Error: {video.error_msg}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )

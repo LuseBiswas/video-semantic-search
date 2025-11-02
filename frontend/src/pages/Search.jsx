@@ -78,13 +78,19 @@ export function Search() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder='Try "sunset", "golden hour", "ocean waves"...'
-              className="w-full px-6 py-4 pr-32 text-lg border-2 border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full px-6 py-4 pr-32 text-lg border-2 border-gray-300 rounded-2xl focus:outline-none transition-colors"
+              style={{ '--focus-color': '#83c5be' }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#83c5be'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
               disabled={loading}
             />
             <button
               type="submit"
               disabled={loading || !query.trim()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2 px-6 py-2.5 text-white rounded-xl font-medium disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              style={{ backgroundColor: loading || !query.trim() ? '' : '#83c5be' }}
+              onMouseEnter={(e) => !loading && query.trim() && (e.currentTarget.style.backgroundColor = '#6fb3aa')}
+              onMouseLeave={(e) => !loading && query.trim() && (e.currentTarget.style.backgroundColor = '#83c5be')}
             >
               {loading ? (
                 <>
@@ -193,11 +199,14 @@ export function Search() {
                       </div>
 
                       {/* Score Badge */}
-                      <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium ${
-                        result.score >= 0.8 ? 'bg-green-600' :
-                        result.score >= 0.6 ? 'bg-blue-600' :
-                        'bg-yellow-600'
-                      } text-white`}>
+                      <div 
+                        className="absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium text-white"
+                        style={{
+                          backgroundColor: result.score >= 0.8 ? '#28a745' :
+                            result.score >= 0.6 ? '#83c5be' :
+                            '#ffc107'
+                        }}
+                      >
                         {Math.round(result.score * 100)}%
                       </div>
                     </div>
@@ -222,7 +231,12 @@ export function Search() {
                             At {formatTimestamp(result.timestamp_ms)}
                           </p>
                         </div>
-                        <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors opacity-0 group-hover:opacity-100">
+                        <button 
+                          className="px-3 py-1.5 text-white rounded-lg text-xs font-medium transition-colors opacity-0 group-hover:opacity-100"
+                          style={{ backgroundColor: '#83c5be' }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6fb3aa'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#83c5be'}
+                        >
                           Play
                         </button>
                       </div>

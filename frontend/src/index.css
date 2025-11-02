@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+@theme {
+  /* Custom Colors */
+  --color-custom-white: #f8f9fa;
+  --color-custom-blue: #83c5be;
+  --color-custom-blue-hover: #6fb3aa;
+  --color-custom-blue-light: #b0dcd8;
+}

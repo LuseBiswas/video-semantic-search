@@ -24,12 +24,26 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const signUp = async (email, password) => {
+  const signUp = async (email, password, fullName = '') => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
     })
     if (error) throw error
+    
+    // Update profile with full name
+    if (data.user && fullName) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ full_name: fullName })
+        .eq('id', data.user.id)
+      
+      if (profileError) {
+        console.error('Error updating profile:', profileError)
+        // Don't throw - account is created, profile update can be done later
+      }
+    }
+    
     return data
   }
 

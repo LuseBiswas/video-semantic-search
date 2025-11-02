@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Optional
 
 from worker.utils.ffmpeg import probe_video, extract_frames
-from worker.utils.embeddings import get_model, encode_images_batch
+from worker.utils.embeddings import get_model
+from worker.utils.captioning import generate_captions_batch
 from worker.utils.supabase_io import (
     upload_frame,
     insert_video,
@@ -111,13 +112,18 @@ def ingest_video(
         )
         print(f"   ✅ Video record created (status: processing)")
         
-        # Step 4: Load embedding model
-        print("\n🤖 Step 4: Loading OpenCLIP model...")
+        # Step 4: Load models
+        print("\n🤖 Step 4: Loading AI models...")
         model = get_model(
             model_name=settings.MODEL_NAME,
             pretrained=settings.MODEL_PRETRAIN
         )
-        print(f"   ✅ Model loaded: {settings.MODEL_NAME}")
+        print(f"   ✅ OpenCLIP model loaded: {settings.MODEL_NAME}")
+        
+        # Pre-load caption model (will be lazy-loaded on first use)
+        from worker.utils.captioning import get_caption_model
+        get_caption_model()
+        print(f"   ✅ BLIP captioning model loaded")
         
         # Step 5: Extract frames and process in batches
         print(f"\n🎞️  Step 5: Extracting frames at {fps} fps...")
@@ -198,7 +204,7 @@ def process_frame_batch(
     model
 ) -> int:
     """
-    Process a batch of frames: encode embeddings, upload frames, insert segments.
+    Process a batch of frames: encode embeddings, generate captions, upload frames, insert segments.
     
     Args:
         frames: List of PIL Images
@@ -213,8 +219,11 @@ def process_frame_batch(
     # Compute embeddings in batch (efficient)
     embeddings = model.encode_images_batch(frames)
     
+    # Generate captions in batch
+    captions = generate_captions_batch(frames)
+    
     # Upload frames and insert segments
-    for i, (frame, timestamp_ms, embedding) in enumerate(zip(frames, timestamps, embeddings)):
+    for i, (frame, timestamp_ms, embedding, caption) in enumerate(zip(frames, timestamps, embeddings, captions)):
         # Generate frame path
         frame_filename = f"frame_{timestamp_ms:08d}.jpg"
         frame_path = f"{user_id}/{video_id}/{frame_filename}"
@@ -227,14 +236,15 @@ def process_frame_batch(
             quality=85
         )
         
-        # Insert segment with embedding
+        # Insert segment with embedding and caption
         insert_segment(
             video_id=video_id,
             t_start_ms=timestamp_ms,
             t_end_ms=timestamp_ms,
             frame_url=f"{settings.BUCKET_FRAMES}/{frame_path}",
             emb=embedding.tolist(),  # Convert numpy array to list
-            modality="vision"
+            modality="vision",
+            caption={"text": caption}  # Store caption in JSONB field
         )
     
     return len(frames)

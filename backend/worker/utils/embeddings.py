@@ -5,6 +5,7 @@ import open_clip
 import torch
 from PIL import Image
 from typing import Optional
+from transformers import BlipProcessor, BlipForConditionalGeneration
 
 
 class EmbeddingModel:
@@ -116,8 +117,10 @@ class EmbeddingModel:
         return embeddings
 
 
-# Global model instance (lazy-loaded)
+# Global model instances (lazy-loaded)
 _model: Optional[EmbeddingModel] = None
+_caption_processor = None
+_caption_model = None
 
 
 def get_model(

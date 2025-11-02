@@ -204,6 +204,15 @@ export function Search() {
 
                     {/* Info */}
                     <div className="p-4">
+                      {/* AI Caption */}
+                      {result.caption && (
+                        <div className="mb-3 pb-3 border-b border-gray-100">
+                          <p className="text-sm text-gray-700 italic">
+                            "{result.caption}"
+                          </p>
+                        </div>
+                      )}
+                      
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-900 mb-1">

@@ -1,6 +1,7 @@
 """Supabase Storage and Database I/O utilities."""
 
 import io
+import json
 import uuid
 import psycopg
 import httpx
@@ -205,14 +206,17 @@ def insert_segment(
     """
     segment_id = str(uuid.uuid4())
     
+    # Convert caption dict to JSON string for JSONB column
+    caption_json = json.dumps(caption) if caption else None
+    
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO public.segments (
                     id, video_id, t_start_ms, t_end_ms, modality, frame_url, emb, caption
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (segment_id, video_id, t_start_ms, t_end_ms, modality, frame_url, emb, caption))
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+            """, (segment_id, video_id, t_start_ms, t_end_ms, modality, frame_url, emb, caption_json))
             conn.commit()
     
     return segment_id

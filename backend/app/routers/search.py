@@ -29,6 +29,7 @@ class SearchResult(BaseModel):
     timestamp_ms: int
     score: float
     preview_url: str
+    caption: Optional[str] = None
 
 
 class SearchResponse(BaseModel):
@@ -70,7 +71,8 @@ def search_videos(request: SearchRequest):
                         s.video_id,
                         s.t_start_ms,
                         s.frame_url,
-                        1 - (s.emb <=> %s::vector) AS score
+                        1 - (s.emb <=> %s::vector) AS score,
+                        s.caption
                     FROM public.segments s
                     JOIN public.videos v ON s.video_id = v.id
                     WHERE v.user_id = %s 
@@ -94,7 +96,8 @@ def search_videos(request: SearchRequest):
                         s.video_id,
                         s.t_start_ms,
                         s.frame_url,
-                        1 - (s.emb <=> %s::vector) AS score
+                        1 - (s.emb <=> %s::vector) AS score,
+                        s.caption
                     FROM public.segments s
                     JOIN public.videos v ON s.video_id = v.id
                     WHERE v.user_id = %s 
@@ -120,17 +123,21 @@ def search_videos(request: SearchRequest):
     
     if rows:
         print(f"\n📊 Top 10 Results (sorted by score):")
-        for i, (seg_id, vid_id, ts, url, score) in enumerate(rows[:10], 1):
+        for i, row in enumerate(rows[:10], 1):
+            seg_id, vid_id, ts, url, score, caption_json = row
             badge = "✓" if score >= request.min_score else "✗"
             timestamp = f"{ts//60000}:{(ts//1000)%60:02d}"
-            # Extract frame filename for context
-            frame_name = url.split('/')[-1] if url else 'unknown'
+            
+            # Extract caption text
+            caption_text = caption_json.get('text', 'no caption') if caption_json else 'no caption'
+            
             print(f"  {badge} #{i}: score={score:.4f} ({score*100:.1f}%) at {timestamp}")
-            print(f"       Video: {str(vid_id)[:8]}... | Frame: {frame_name}")
-            print(f"       Match quality: {'GOOD' if score >= 0.6 else 'FAIR' if score >= 0.5 else 'POOR'}")
+            print(f"       Caption: \"{caption_text}\"")
+            print(f"       Video: {str(vid_id)[:8]}...")
+            print(f"       Quality: {'GOOD' if score >= 0.6 else 'FAIR' if score >= 0.5 else 'POOR'}")
     
     # Filter by minimum score threshold
-    filtered_rows = [(seg_id, vid_id, ts, url, score) for seg_id, vid_id, ts, url, score in rows if score >= request.min_score]
+    filtered_rows = [(seg_id, vid_id, ts, url, score, caption) for seg_id, vid_id, ts, url, score, caption in rows if score >= request.min_score]
     
     print(f"\n✅ Results above threshold ({request.min_score}): {len(filtered_rows)}")
     print(f"{'='*60}\n")
@@ -141,7 +148,10 @@ def search_videos(request: SearchRequest):
     # Step 5: Generate signed URLs for preview frames
     results = []
     for moment in moments[:request.top_k]:
-        segment_id, video_id, timestamp_ms, frame_url, score = moment
+        segment_id, video_id, timestamp_ms, frame_url, score, caption_json = moment
+        
+        # Extract caption text
+        caption_text = caption_json.get('text') if caption_json else None
         
         # Extract bucket and path from frame_url
         # Expected format: "frames/user_id/video_id/frame_xxx.jpg"
@@ -161,7 +171,8 @@ def search_videos(request: SearchRequest):
             segment_id=str(segment_id),
             timestamp_ms=timestamp_ms,
             score=round(score, 4),
-            preview_url=preview_url
+            preview_url=preview_url,
+            caption=caption_text
         ))
     
     return SearchResponse(
@@ -179,7 +190,7 @@ def group_into_moments(
     Group nearby segments into moments.
     
     Args:
-        segments: List of (segment_id, video_id, timestamp_ms, frame_url, score)
+        segments: List of (segment_id, video_id, timestamp_ms, frame_url, score, caption)
         time_threshold_ms: Max gap between segments to group as same moment
     
     Returns:
@@ -192,7 +203,7 @@ def group_into_moments(
     current_moment = None
     
     for seg in segments:
-        segment_id, video_id, timestamp_ms, frame_url, score = seg
+        segment_id, video_id, timestamp_ms, frame_url, score, caption = seg
         
         if current_moment is None:
             # Start first moment

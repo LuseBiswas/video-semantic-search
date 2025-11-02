@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { DashboardLayout } from '../components/DashboardLayout'
 import { UploadModal } from '../components/UploadModal'
-import { listVideos, deleteVideo, getVideo } from '../lib/api'
-import { Upload, Video, Clock, CheckCircle, AlertCircle, Loader, RefreshCw, MoreVertical, Trash2 } from 'lucide-react'
+import { listVideos, deleteVideo, getVideo, searchVideos } from '../lib/api'
+import { supabase } from '../lib/supabase'
+import { Upload, Video, Clock, CheckCircle, AlertCircle, Loader, MoreVertical, Trash2, Search, X } from 'lucide-react'
 
 export function Dashboard() {
   const { user } = useAuth()
@@ -17,6 +18,9 @@ export function Dashboard() {
   const [deleting, setDeleting] = useState(false)
   const [processingVideos, setProcessingVideos] = useState([])
   const [progress, setProgress] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [userProfile, setUserProfile] = useState(null)
   const menuRef = useRef(null)
   const pollIntervalRef = useRef(null)
 
@@ -39,8 +43,25 @@ export function Dashboard() {
   useEffect(() => {
     if (user?.id) {
       fetchVideos()
+      fetchUserProfile()
     }
   }, [user?.id])
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+
+      if (!error && data) {
+        setUserProfile(data)
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err)
+    }
+  }
 
   const handleUploadSuccess = (videoId) => {
     // Add to processing list
@@ -138,6 +159,39 @@ export function Dashboard() {
     setVideoToDelete(null)
   }
 
+  const handleSearch = async (e) => {
+    e.preventDefault()
+    if (!searchQuery.trim()) {
+      fetchVideos() // Reset to all videos if search is empty
+      return
+    }
+
+    setSearching(true)
+    setError('')
+    try {
+      const results = await searchVideos(searchQuery, user.id)
+      
+      // Extract unique video IDs from search results
+      const videoIds = [...new Set(results.results.map(r => r.video_id))]
+      
+      // Fetch full video details for these IDs
+      const allVideos = await listVideos(user.id)
+      const matchedVideos = allVideos.filter(v => videoIds.includes(v.id) && v.status === 'ready')
+      
+      setVideos(matchedVideos)
+    } catch (err) {
+      setError(err.message)
+      console.error('Search error:', err)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const handleClearSearch = () => {
+    setSearchQuery('')
+    fetchVideos()
+  }
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -186,28 +240,39 @@ export function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header with Refresh Button */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              My Videos
-            </h2>
-            <p className="text-gray-600">
-              {videos.length} video{videos.length !== 1 ? 's' : ''} uploaded
-            </p>
-          </div>
-          <button
-            onClick={fetchVideos}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-3 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
-            style={{ backgroundColor: 'white' }}
-            onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = '#e9ecef')}
-            onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = 'white')}
-            title="Refresh video list"
-          >
-            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
+        {/* Header with Greeting and Search */}
+        <div className="flex items-center gap-6">
+          <h2 className="text-2xl font-bold text-gray-900 whitespace-nowrap">
+            Hey, {userProfile?.full_name || 'there'}! 👋
+          </h2>
+
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="flex-1">
+            <div className="flex items-center border-b-2 border-gray-300 focus-within:border-custom-blue transition-colors pb-2">
+              <Search size={20} className="text-gray-400 mr-3" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search your videos by content... (e.g., 'sunset', 'dog playing')"
+                className="flex-1 outline-none text-gray-900 placeholder-gray-400 bg-transparent"
+                disabled={searching}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="ml-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                  title="Clear search"
+                >
+                  <X size={16} />
+                </button>
+              )}
+              {searching && (
+                <Loader size={18} className="ml-2 text-gray-400 animate-spin" />
+              )}
+            </div>
+          </form>
         </div>
 
         {/* Videos Grid */}

@@ -5,7 +5,7 @@ import { DashboardLayout } from '../components/DashboardLayout'
 import { UploadModal } from '../components/UploadModal'
 import { listVideos, deleteVideo, getVideo, searchVideos } from '../lib/api'
 import { supabase } from '../lib/supabase'
-import { Upload, Video, Clock, CheckCircle, AlertCircle, Loader, MoreVertical, Trash2, Search, X } from 'lucide-react'
+import { Upload, Video, Clock, CheckCircle, AlertCircle, Loader, MoreVertical, Trash2, Search, X, Play } from 'lucide-react'
 
 export function Dashboard() {
   const { user } = useAuth()
@@ -22,8 +22,11 @@ export function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
+  const [hoveredVideoId, setHoveredVideoId] = useState(null)
+  const [loadedVideoIds, setLoadedVideoIds] = useState(new Set())
   const menuRef = useRef(null)
   const pollIntervalRef = useRef(null)
+  const videoRefs = useRef({})
 
   const fetchVideos = async () => {
     try {
@@ -389,6 +392,37 @@ export function Dashboard() {
           >
             {videos.map((video, index) => {
               const bentoClass = getBentoClass(video, index)
+              const isHovering = hoveredVideoId === video.id
+              const isVideoLoaded = loadedVideoIds.has(video.id)
+              
+              const handleMouseEnter = () => {
+                setHoveredVideoId(video.id)
+                
+                // Small delay to avoid accidental triggers
+                setTimeout(() => {
+                  const videoElement = videoRefs.current[video.id]
+                  console.log('▶️ Attempting to play:', video.id.slice(0, 8), 'element:', !!videoElement, 'url:', !!video.video_url)
+                  if (videoElement && video.video_url) {
+                    videoElement.currentTime = 0
+                    videoElement.play().catch(err => {
+                      console.log('Playback failed:', err)
+                    })
+                  }
+                }, 150)
+              }
+              
+              const handleMouseLeave = () => {
+                setHoveredVideoId(null)
+                const videoElement = videoRefs.current[video.id]
+                if (videoElement) {
+                  videoElement.pause()
+                  videoElement.currentTime = 0
+                }
+              }
+              
+              const handleVideoLoaded = () => {
+                setLoadedVideoIds(prev => new Set([...prev, video.id]))
+              }
               
               return (
                 <motion.div
@@ -401,16 +435,21 @@ export function Dashboard() {
                     ease: [0.4, 0, 0.2, 1]
                   }}
                   className={`group cursor-pointer relative ${bentoClass} h-full`}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
                 >
-                  {/* Thumbnail */}
+                  {/* Thumbnail and Video Container */}
                   <div 
                     className="relative bg-gray-900 rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all w-full h-full"
                   >
+                    {/* Thumbnail (always visible) */}
                     {video.thumbnail_url ? (
                       <img 
                         src={video.thumbnail_url} 
                         alt={`Video ${video.id.slice(0, 8)}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className={`w-full h-full object-cover transition-all duration-300 ${
+                          isHovering && isVideoLoaded ? 'opacity-0' : 'opacity-100 group-hover:scale-105'
+                        }`}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -418,15 +457,40 @@ export function Dashboard() {
                       </div>
                     )}
                     
+                    {/* Video Element (plays on hover) */}
+                    {video.video_url && (
+                      <video
+                        ref={el => videoRefs.current[video.id] = el}
+                        src={video.video_url}
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+                          isHovering && isVideoLoaded ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        onLoadedData={handleVideoLoaded}
+                      />
+                    )}
+                    
+                    {/* Play Icon Overlay (shows on hover before video loads) */}
+                    {!isVideoLoaded && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 pointer-events-none">
+                        <div className="w-16 h-16 rounded-full bg-white bg-opacity-90 flex items-center justify-center opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all duration-300">
+                          <Play size={24} className="text-gray-900 ml-1" fill="currentColor" />
+                        </div>
+                      </div>
+                    )}
+                    
                     {/* Duration Overlay */}
                     {video.duration_ms && (
-                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 px-2 py-1 rounded text-xs font-medium text-white">
+                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 px-2 py-1 rounded text-xs font-medium text-white z-10">
                         {formatDuration(video.duration_ms)}
                       </div>
                     )}
                     
                     {/* Video Title Overlay at Bottom */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8 z-10">
                       <h4 className="font-medium text-white text-sm truncate">
                         Video {video.id.slice(0, 8)}...
                       </h4>
@@ -434,18 +498,18 @@ export function Dashboard() {
                     
                     {/* Processing/Error Indicator (if not ready) */}
                     {video.status === 'processing' && (
-                      <div className="absolute top-2 left-2">
+                      <div className="absolute top-2 left-2 z-10">
                         <Loader size={16} className="text-white animate-spin" />
                       </div>
                     )}
                     {video.status === 'error' && (
-                      <div className="absolute top-2 left-2">
+                      <div className="absolute top-2 left-2 z-10">
                         <AlertCircle size={16} className="text-red-500" />
                       </div>
                     )}
 
                     {/* Three Dots Menu */}
-                    <div className="absolute top-2 right-2" ref={openMenuId === video.id ? menuRef : null}>
+                    <div className="absolute top-2 right-2 z-20" ref={openMenuId === video.id ? menuRef : null}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()

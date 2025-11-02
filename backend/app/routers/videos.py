@@ -30,6 +30,7 @@ class VideoResponse(BaseModel):
     error_msg: Optional[str] = None
     created_at: str
     thumbnail_url: Optional[str] = None
+    video_url: Optional[str] = None  # Signed URL for video playback
 
 
 class UploadResponse(BaseModel):
@@ -147,6 +148,18 @@ def get_video_details(video_id: str, user_id: str):
         except Exception as e:
             print(f"Failed to generate signed URL for thumbnail: {e}")
     
+    # Generate signed URL for video
+    video_url = None
+    if video.get('url'):
+        try:
+            # Split bucket and path: "videos/user_id/video_id/filename" -> bucket="videos", path="user_id/video_id/filename"
+            parts = video['url'].split('/', 1)
+            if len(parts) == 2:
+                bucket, path = parts
+                video_url = get_signed_url(bucket, path, expires_in=3600)
+        except Exception as e:
+            print(f"Failed to generate signed URL for video: {e}")
+    
     return VideoResponse(
         id=str(video['id']),
         user_id=str(video['user_id']),
@@ -157,7 +170,8 @@ def get_video_details(video_id: str, user_id: str):
         status=video['status'],
         error_msg=video['error_msg'],
         created_at=video['created_at'].isoformat() if video['created_at'] else None,
-        thumbnail_url=thumbnail_url
+        thumbnail_url=thumbnail_url,
+        video_url=video_url
     )
 
 
@@ -199,6 +213,18 @@ def list_videos(user_id: str, limit: int = 50):
                     except Exception as e:
                         print(f"Failed to generate signed URL for thumbnail: {e}")
                 
+                # Generate signed URL for video
+                video_url = None
+                if row[2]:  # url from DB (format: "videos/user_id/video_id/filename")
+                    try:
+                        # Split bucket and path
+                        parts = row[2].split('/', 1)
+                        if len(parts) == 2:
+                            bucket, path = parts
+                            video_url = get_signed_url(bucket, path, expires_in=3600)
+                    except Exception as e:
+                        print(f"Failed to generate signed URL for video: {e}")
+                
                 videos.append(VideoResponse(
                     id=str(row[0]),
                     user_id=str(row[1]),
@@ -209,7 +235,8 @@ def list_videos(user_id: str, limit: int = 50):
                     status=row[6],
                     error_msg=row[7],
                     created_at=row[8].isoformat() if row[8] else None,
-                    thumbnail_url=thumbnail_url
+                    thumbnail_url=thumbnail_url,
+                    video_url=video_url
                 ))
             
             return videos

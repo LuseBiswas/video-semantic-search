@@ -1,4 +1,4 @@
-import { Home, Box, Search, User, LogOut, Settings, ChevronDown, TreePine } from 'lucide-react'
+import { Home, Box, Search, User, LogOut, Settings, ChevronDown, TreePine, Rabbit } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
@@ -72,9 +72,9 @@ export function Sidebar() {
       <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm text-white" style={{ backgroundColor: '#83c5be' }}>
-          <TreePine />
+          <Rabbit />
           </div>
-          <span className="font-semibold text-xl text-gray-900">MemoryTree</span>
+          <span className="font-semibold text-xl text-gray-900">Hop2Engram</span>
         </div>
         {/* <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600">
           <Box size={20} />

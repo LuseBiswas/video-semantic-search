@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Loader } from 'lucide-react'
+import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 
 export function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -9,9 +9,15 @@ export function ProtectedRoute({ children }) {
     return (
       <div 
         className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: '#f8f9fa' }}
+        style={{ backgroundColor: '#ffffff' }}
       >
-        <Loader size={48} className="animate-spin" style={{ color: '#83c5be' }} />
+        <div className="w-64 h-64">
+          <DotLottieReact
+            src="/Davsan.lottie"
+            loop
+            autoplay
+          />
+        </div>
       </div>
     )
   }

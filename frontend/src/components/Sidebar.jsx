@@ -121,7 +121,10 @@ export function Sidebar() {
           className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition-colors"
         >
           {/* Avatar */}
-          <div className="w-10 h-10 rounded-full bg-custom-blue flex items-center justify-center text-white overflow-hidden">
+          <div 
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white overflow-hidden flex-shrink-0"
+            style={{ backgroundColor: '#83c5be' }}
+          >
             {profile?.avatar_url ? (
               <img 
                 src={profile.avatar_url} 

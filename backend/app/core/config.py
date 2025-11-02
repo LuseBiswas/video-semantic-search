@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # API
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     
+    # OpenAI
+    OPENAI_API_KEY: str = ""
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

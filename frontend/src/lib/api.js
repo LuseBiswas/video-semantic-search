@@ -58,7 +58,7 @@ export async function getVideo(videoId, userId) {
 /**
  * Search videos
  */
-export async function searchVideos(query, userId, topK = 20, minScore = 0.5, videoId = null) {
+export async function searchVideos(query, userId, topK = 20, minScore = 0, semanticThreshold = 0.7, videoId = null) {
   const response = await fetch(`${API_BASE}/v1/search`, {
     method: 'POST',
     headers: {
@@ -68,7 +68,8 @@ export async function searchVideos(query, userId, topK = 20, minScore = 0.5, vid
       query,
       user_id: userId,
       top_k: topK,
-      min_score: minScore,
+      min_score: minScore,  // Set to 0 to let OpenAI do all filtering
+      semantic_threshold: semanticThreshold,  // OpenAI similarity threshold (0.7 = 70%)
       ...(videoId && { video_id: videoId }),
     }),
   })

@@ -8,6 +8,7 @@ from app.db import get_connection
 from worker.utils.embeddings import encode_text
 from worker.utils.supabase_io import get_signed_url
 from app.core.config import settings
+from app.utils.openai_filter import filter_results_by_semantic_similarity
 
 
 router = APIRouter(prefix="/v1/search", tags=["search"])
@@ -18,7 +19,8 @@ class SearchRequest(BaseModel):
     query: str
     user_id: str
     top_k: int = 20
-    min_score: float = 0.5  # Minimum similarity score (0.0 to 1.0)
+    min_score: float = 0.5  # Minimum visual similarity score (0.0 to 1.0)
+    semantic_threshold: float = 0.7  # Minimum semantic similarity for OpenAI filter (0.0 to 1.0)
     video_id: Optional[str] = None  # Optional: search within specific video
 
 
@@ -136,10 +138,21 @@ def search_videos(request: SearchRequest):
             print(f"       Video: {str(vid_id)[:8]}...")
             print(f"       Quality: {'GOOD' if score >= 0.6 else 'FAIR' if score >= 0.5 else 'POOR'}")
     
-    # Filter by minimum score threshold
-    filtered_rows = [(seg_id, vid_id, ts, url, score, caption) for seg_id, vid_id, ts, url, score, caption in rows if score >= request.min_score]
+    # Step 3a: Filter by minimum visual score threshold (optional, can be disabled by setting to 0)
+    if request.min_score > 0:
+        filtered_rows = [(seg_id, vid_id, ts, url, score, caption) for seg_id, vid_id, ts, url, score, caption in rows if score >= request.min_score]
+        print(f"\n✅ Results above visual threshold ({request.min_score}): {len(filtered_rows)}")
+    else:
+        filtered_rows = rows
+        print(f"\n✅ Visual threshold disabled, keeping all {len(filtered_rows)} results")
     
-    print(f"\n✅ Results above threshold ({request.min_score}): {len(filtered_rows)}")
+    # Step 3b: Apply OpenAI semantic filtering
+    filtered_rows = filter_results_by_semantic_similarity(
+        query=request.query,
+        results=filtered_rows,
+        threshold=request.semantic_threshold
+    )
+    
     print(f"{'='*60}\n")
     
     # Step 4: Group nearby segments into moments (optional: within 2s = same moment)

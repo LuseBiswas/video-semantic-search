@@ -107,19 +107,21 @@ export function Profile() {
 
       // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop()
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file)
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        })
 
       if (uploadError) throw uploadError
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
-        .getPublicUrl(filePath)
+        .getPublicUrl(fileName)
 
       setProfile({ ...profile, avatar_url: publicUrl })
       setMessage({ type: 'success', text: 'Avatar uploaded! Click Save to keep changes.' })

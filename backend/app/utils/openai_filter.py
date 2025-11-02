@@ -44,22 +44,39 @@ def calculate_text_similarity(query: str, caption: str) -> float:
         client = get_openai_client()
         
         # Create prompt asking GPT to match search term with caption
-        prompt = f"""You are a video search assistant. Determine if the search term matches the video caption.
+        prompt = f"""You are an expert video search assistant. Score how well a search term matches a video caption.
+
+Return ONLY an integer from 0 to 100.
 
 Search Term: "{query}"
 Video Caption: "{caption}"
 
-Does the search term match what is described in the video caption?
-Consider:
-- Synonyms (e.g., "dog" matches "puppy", "laying" matches "sleeping")
-- Partial matches (e.g., "dog" matches "brown dog in snow")
-- Context (e.g., "sunset" matches "golden hour")
+Follow these steps before scoring:
+1) Extract: SUBJECT(S), ACTION(S), OBJECT(S), CONTEXT/ATTRIBUTES (location, scene, adjectives) from BOTH query and caption.
+2) Normalize terms using synonyms, lemmatization, and category parents (hypernyms). Examples:
+   - couple ≈ man+woman ≈ two people ≈ pair
+   - person ≈ man ≈ woman ≈ individual
+   - dog ≈ puppy ≈ canine
+   - laying ≈ lying ≈ resting (≈ sleeping if unclear)
+   - outside ≈ outdoors
+   - child ≈ kid ≈ boy ≈ girl
+   - toys ≈ playthings; thread/yarn ≈ craft material; toys and craft supplies share parent: "play/craft items"
+3) Similarity rules (apply all that fit):
+   A. SUBJECT MATCH (weight 0.40): exact, synonym, or parent-child (girl ≈ child). Penalize subject conflicts.
+   B. ACTION MATCH (0.25): exact/close verbs (play vs playing), related-neutral (sitting can co-occur with play → partial credit), conflicting (sleeping vs running).
+   C. OBJECT MATCH (0.25): exact, synonym, or category-sibling via a shared parent. (thread ↔ yarn ↔ craft material; toys ↔ playthings; both under "play/craft items" → partial).
+   D. CONTEXT MATCH (0.10): locations/attributes (table/classroom/indoors/outdoors). Minor differences should not dominate.
+4) Negative/contradictory cues lower the score (e.g., “cat” vs “dog”, “night” vs “day” if critical).
+5) Favor recall: if the main subject aligns and objects/actions are plausible/related, award partial credit (don’t output near-zero unless clearly different).
 
-Respond with ONLY a number from 0 to 100 representing the match percentage.
-- 100 = Perfect match
-- 80-99 = Strong match (synonyms, close meaning)
-- 50-79 = Partial match (related concepts)
-- 0-49 = Poor match (different concepts)
+SCORING BANDS:
+- 95–100: Near-exact: core subject+action+object all align.
+- 85–94: Strong: same core subject(s); action/object are synonyms or very close.
+- 70–84: Good: main subject matches; action OR object related/sibling; context may differ.
+- 50–69: Partial: related domain; only some elements match (e.g., subject matches; object is category sibling; action neutral).
+- 0–49: Poor: different subjects or clearly unrelated.
+
+Output: integer score 0–100 ONLY.
 
 Your response (number only):"""
 

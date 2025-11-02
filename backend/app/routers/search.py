@@ -20,7 +20,7 @@ class SearchRequest(BaseModel):
     user_id: str
     top_k: int = 20
     min_score: float = 0.5  # Minimum visual similarity score (0.0 to 1.0)
-    semantic_threshold: float = 0.7  # Minimum semantic similarity for OpenAI filter (0.0 to 1.0)
+    semantic_threshold: float = 0.49  # Minimum semantic similarity for OpenAI filter (0.0 to 1.0)
     video_id: Optional[str] = None  # Optional: search within specific video
 
 

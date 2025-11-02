@@ -58,7 +58,7 @@ export async function getVideo(videoId, userId) {
 /**
  * Search videos
  */
-export async function searchVideos(query, userId, topK = 20, minScore = 0, semanticThreshold = 0.7, videoId = null) {
+export async function searchVideos(query, userId, topK = 20, minScore = 0, semanticThreshold = 0.49, videoId = null) {
   const response = await fetch(`${API_BASE}/v1/search`, {
     method: 'POST',
     headers: {

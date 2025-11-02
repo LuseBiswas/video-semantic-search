@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     EMB_DIM: int = 512  # ViT-B-32 produces 512-dim embeddings
     
     # API
-    CORS_ORIGINS: str = "http://localhost:3000"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     
     class Config:
         env_file = ".env"

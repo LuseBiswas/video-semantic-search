@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from pydantic import BaseModel
 from typing import Optional, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.db import get_connection
 from worker.ingest_video import ingest_video
@@ -175,10 +176,62 @@ def get_video_details(video_id: str, user_id: str):
     )
 
 
+def _generate_signed_urls_for_video(row: tuple) -> dict:
+    """
+    Generate signed URLs for a single video (thumbnail + video).
+    Helper function for parallel execution.
+    
+    Args:
+        row: Database row (id, user_id, url, duration_ms, width, height, status, error_msg, created_at, thumbnail_url)
+    
+    Returns:
+        Dict with video data and signed URLs
+    """
+    video_id, user_id, url, duration_ms, width, height, status, error_msg, created_at, thumbnail_url_raw = row
+    
+    thumbnail_url = None
+    video_url = None
+    
+    # Generate signed URL for thumbnail if it exists
+    if thumbnail_url_raw:
+        try:
+            parts = thumbnail_url_raw.split('/', 1)
+            if len(parts) == 2:
+                bucket, path = parts
+                thumbnail_url = get_signed_url(bucket, path, expires_in=3600)
+        except Exception as e:
+            print(f"Failed to generate signed URL for thumbnail: {e}")
+    
+    # Generate signed URL for video
+    if url:
+        try:
+            parts = url.split('/', 1)
+            if len(parts) == 2:
+                bucket, path = parts
+                video_url = get_signed_url(bucket, path, expires_in=3600)
+        except Exception as e:
+            print(f"Failed to generate signed URL for video: {e}")
+    
+    return {
+        'id': str(video_id),
+        'user_id': str(user_id),
+        'url': url,
+        'duration_ms': duration_ms,
+        'width': width,
+        'height': height,
+        'status': status,
+        'error_msg': error_msg,
+        'created_at': created_at.isoformat() if created_at else None,
+        'thumbnail_url': thumbnail_url,
+        'video_url': video_url
+    }
+
+
 @router.get("", response_model=List[VideoResponse])
 def list_videos(user_id: str, limit: int = 50):
     """
     List all videos for a user.
+    Uses parallel execution for signed URL generation.
     
     Args:
         user_id: User UUID
@@ -199,45 +252,34 @@ def list_videos(user_id: str, limit: int = 50):
             
             rows = cur.fetchall()
             
+            if not rows:
+                return []
+            
+            # Generate signed URLs in parallel
             videos = []
-            for row in rows:
-                # Generate signed URL for thumbnail if it exists
-                thumbnail_url = None
-                if row[9]:  # thumbnail_url from DB (format: "frames/user_id/video_id/thumbnail.jpg")
-                    try:
-                        # Split bucket and path: "frames/user_id/video_id/thumbnail.jpg" -> bucket="frames", path="user_id/video_id/thumbnail.jpg"
-                        parts = row[9].split('/', 1)
-                        if len(parts) == 2:
-                            bucket, path = parts
-                            thumbnail_url = get_signed_url(bucket, path, expires_in=3600)
-                    except Exception as e:
-                        print(f"Failed to generate signed URL for thumbnail: {e}")
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                # Submit all tasks
+                future_to_row = {
+                    executor.submit(_generate_signed_urls_for_video, row): idx
+                    for idx, row in enumerate(rows)
+                }
                 
-                # Generate signed URL for video
-                video_url = None
-                if row[2]:  # url from DB (format: "videos/user_id/video_id/filename")
+                # Collect results as they complete
+                results = []
+                for future in as_completed(future_to_row):
                     try:
-                        # Split bucket and path
-                        parts = row[2].split('/', 1)
-                        if len(parts) == 2:
-                            bucket, path = parts
-                            video_url = get_signed_url(bucket, path, expires_in=3600)
+                        result = future.result()
+                        idx = future_to_row[future]
+                        results.append((idx, result))
                     except Exception as e:
-                        print(f"Failed to generate signed URL for video: {e}")
+                        print(f"Error generating signed URLs: {e}")
                 
-                videos.append(VideoResponse(
-                    id=str(row[0]),
-                    user_id=str(row[1]),
-                    url=row[2],
-                    duration_ms=row[3],
-                    width=row[4],
-                    height=row[5],
-                    status=row[6],
-                    error_msg=row[7],
-                    created_at=row[8].isoformat() if row[8] else None,
-                    thumbnail_url=thumbnail_url,
-                    video_url=video_url
-                ))
+                # Sort by original order
+                results.sort(key=lambda x: x[0])
+                
+                # Build response
+                for _, video_data in results:
+                    videos.append(VideoResponse(**video_data))
             
             return videos
 

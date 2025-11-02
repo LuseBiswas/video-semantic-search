@@ -3,6 +3,8 @@
 from openai import OpenAI
 from typing import Optional
 from app.core.config import settings
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 
 
 # Global OpenAI client
@@ -109,18 +111,66 @@ Your response (number only):"""
         return 0.0
 
 
+def _process_single_result(query: str, result: tuple, index: int, threshold: float) -> dict:
+    """
+    Process a single result with OpenAI filtering.
+    Helper function for parallel execution.
+    
+    Args:
+        query: Search query
+        result: (segment_id, video_id, timestamp_ms, frame_url, visual_score, caption_json)
+        index: Result index (1-based for display)
+        threshold: Similarity threshold
+    
+    Returns:
+        Dict with result data and semantic score
+    """
+    segment_id, video_id, timestamp_ms, frame_url, visual_score, caption_json = result
+    
+    # Extract caption text
+    caption_text = caption_json.get('text', '') if caption_json else ''
+    
+    if not caption_text:
+        return {
+            'result': result,
+            'index': index,
+            'caption_text': caption_text,
+            'semantic_score': 0.0,
+            'passed': False,
+            'skipped': True
+        }
+    
+    # Calculate semantic similarity (OpenAI call happens here)
+    semantic_score = calculate_text_similarity(query, caption_text)
+    
+    # Determine if we keep this result
+    passed = semantic_score >= threshold
+    
+    return {
+        'result': result,
+        'index': index,
+        'caption_text': caption_text,
+        'semantic_score': semantic_score,
+        'passed': passed,
+        'skipped': False
+    }
+
+
 def filter_results_by_semantic_similarity(
     query: str,
     results: list[tuple],
-    threshold: float = 0.7
+    threshold: float = 0.7,
+    max_workers: int = 10
 ) -> list[tuple]:
     """
     Filter search results by semantic similarity between query and captions.
+    Uses parallel execution for faster processing.
     
     Args:
         query: User search query (e.g., "dog on snow")
         results: List of (segment_id, video_id, timestamp_ms, frame_url, score, caption_json)
         threshold: Minimum similarity score to keep result (0.0 to 1.0, default 0.7 = 70%)
+        max_workers: Maximum number of parallel threads (default 10)
     
     Returns:
         Filtered list of results
@@ -129,36 +179,60 @@ def filter_results_by_semantic_similarity(
     if not results:
         return results
     
-    print(f"\n🤖 OpenAI GPT Semantic Filtering - Threshold: {threshold*100}%")
+    print(f"\n🤖 OpenAI GPT Semantic Filtering (PARALLEL) - Threshold: {threshold*100}%")
+    print(f"   Workers: {max_workers} | Results to process: {len(results)}")
     print(f"{'='*60}")
     
-    filtered_results = []
+    start_time = time.time()
     
-    for i, result in enumerate(results, 1):
-        segment_id, video_id, timestamp_ms, frame_url, visual_score, caption_json = result
+    # Process all results in parallel
+    processed_results = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_result = {
+            executor.submit(_process_single_result, query, result, i, threshold): i
+            for i, result in enumerate(results, 1)
+        }
         
-        # Extract caption text
-        caption_text = caption_json.get('text', '') if caption_json else ''
+        # Collect results as they complete
+        for future in as_completed(future_to_result):
+            try:
+                processed = future.result()
+                processed_results.append(processed)
+            except Exception as e:
+                idx = future_to_result[future]
+                print(f"  ❌ Error processing result #{idx}: {e}")
+    
+    elapsed_time = time.time() - start_time
+    
+    # Sort by original index to maintain order
+    processed_results.sort(key=lambda x: x['index'])
+    
+    # Print results and filter
+    filtered_results = []
+    for processed in processed_results:
+        index = processed['index']
+        caption_text = processed['caption_text']
+        semantic_score = processed['semantic_score']
+        passed = processed['passed']
+        skipped = processed['skipped']
         
-        if not caption_text:
-            print(f"  ⚠️  Result #{i}: No caption, skipping")
+        if skipped:
+            print(f"  ⚠️  Result #{index}: No caption, skipping")
             continue
         
-        # Calculate semantic similarity
-        semantic_score = calculate_text_similarity(query, caption_text)
-        
-        # Determine if we keep this result
-        passed = semantic_score >= threshold
         badge = "✅" if passed else "❌"
-        
+        _, _, timestamp_ms, _, _, _ = processed['result']
         timestamp = f"{timestamp_ms//60000}:{(timestamp_ms//1000)%60:02d}"
-        print(f"  {badge} Result #{i}: semantic={semantic_score:.3f} ({semantic_score*100:.1f}%) at {timestamp}")
+        
+        print(f"  {badge} Result #{index}: semantic={semantic_score:.3f} ({semantic_score*100:.1f}%) at {timestamp}")
         print(f"       Caption: \"{caption_text[:60]}...\"" if len(caption_text) > 60 else f"       Caption: \"{caption_text}\"")
         
         if passed:
-            filtered_results.append(result)
+            filtered_results.append(processed['result'])
     
     print(f"\n✅ Passed filter: {len(filtered_results)}/{len(results)}")
+    print(f"⚡ Processing time: {elapsed_time:.2f}s ({len(results)/elapsed_time:.1f} results/sec)")
     print(f"{'='*60}\n")
     
     return filtered_results

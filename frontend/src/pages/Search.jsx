@@ -149,16 +149,17 @@ export function Search() {
               <div className="p-12 text-center">
                 <Video size={48} className="mx-auto text-gray-300 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  No matching moments found
+                  No relevant moments found
                 </h3>
                 <p className="text-sm text-gray-500 mb-4">
-                  Try different keywords or upload more videos
+                  No frames matched your search with sufficient similarity (≥50%)
                 </p>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto text-left">
-                  <p className="text-xs text-blue-800 font-medium mb-2">💡 Tips:</p>
+                  <p className="text-xs text-blue-800 font-medium mb-2">💡 Why no results?</p>
                   <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
-                    <li>Use descriptive terms: "sunset", "mountain", "person smiling"</li>
-                    <li>Try synonyms: "ocean" / "sea", "golden hour" / "sunset"</li>
+                    <li>The search term doesn't match your video content</li>
+                    <li>Example: Searching "dragon" won't match a beach video</li>
+                    <li>Try terms that describe what's actually in your videos</li>
                     <li>Make sure your videos have status "Ready"</li>
                   </ul>
                 </div>
@@ -192,8 +193,12 @@ export function Search() {
                       </div>
 
                       {/* Score Badge */}
-                      <div className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium">
-                        {Math.round(result.score * 100)}% match
+                      <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium ${
+                        result.score >= 0.8 ? 'bg-green-600' :
+                        result.score >= 0.6 ? 'bg-blue-600' :
+                        'bg-yellow-600'
+                      } text-white`}>
+                        {Math.round(result.score * 100)}%
                       </div>
                     </div>
 

@@ -58,7 +58,7 @@ export async function getVideo(videoId, userId) {
 /**
  * Search videos
  */
-export async function searchVideos(query, userId, topK = 20, videoId = null) {
+export async function searchVideos(query, userId, topK = 20, minScore = 0.5, videoId = null) {
   const response = await fetch(`${API_BASE}/v1/search`, {
     method: 'POST',
     headers: {
@@ -68,6 +68,7 @@ export async function searchVideos(query, userId, topK = 20, videoId = null) {
       query,
       user_id: userId,
       top_k: topK,
+      min_score: minScore,
       ...(videoId && { video_id: videoId }),
     }),
   })

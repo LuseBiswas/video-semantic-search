@@ -18,6 +18,7 @@ class SearchRequest(BaseModel):
     query: str
     user_id: str
     top_k: int = 20
+    min_score: float = 0.5  # Minimum similarity score (0.0 to 1.0)
     video_id: Optional[str] = None  # Optional: search within specific video
 
 
@@ -111,10 +112,33 @@ def search_videos(request: SearchRequest):
             cur.execute(sql, params)
             rows = cur.fetchall()
     
-    # Step 3: Group nearby segments into moments (optional: within 2s = same moment)
-    moments = group_into_moments(rows, time_threshold_ms=2000)
+    # Step 3: Debug logging - show all scores
+    print(f"\n{'='*60}")
+    print(f"🔍 SEARCH: '{request.query}'")
+    print(f"{'='*60}")
+    print(f"Total results from DB: {len(rows)}")
     
-    # Step 4: Generate signed URLs for preview frames
+    if rows:
+        print(f"\n📊 Top 10 Results (sorted by score):")
+        for i, (seg_id, vid_id, ts, url, score) in enumerate(rows[:10], 1):
+            badge = "✓" if score >= request.min_score else "✗"
+            timestamp = f"{ts//60000}:{(ts//1000)%60:02d}"
+            # Extract frame filename for context
+            frame_name = url.split('/')[-1] if url else 'unknown'
+            print(f"  {badge} #{i}: score={score:.4f} ({score*100:.1f}%) at {timestamp}")
+            print(f"       Video: {str(vid_id)[:8]}... | Frame: {frame_name}")
+            print(f"       Match quality: {'GOOD' if score >= 0.6 else 'FAIR' if score >= 0.5 else 'POOR'}")
+    
+    # Filter by minimum score threshold
+    filtered_rows = [(seg_id, vid_id, ts, url, score) for seg_id, vid_id, ts, url, score in rows if score >= request.min_score]
+    
+    print(f"\n✅ Results above threshold ({request.min_score}): {len(filtered_rows)}")
+    print(f"{'='*60}\n")
+    
+    # Step 4: Group nearby segments into moments (optional: within 2s = same moment)
+    moments = group_into_moments(filtered_rows, time_threshold_ms=2000)
+    
+    # Step 5: Generate signed URLs for preview frames
     results = []
     for moment in moments[:request.top_k]:
         segment_id, video_id, timestamp_ms, frame_url, score = moment

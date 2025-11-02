@@ -1,4 +1,4 @@
-import { Home, Box } from 'lucide-react'
+import { Home, Box, Search } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 export function Sidebar() {
@@ -6,6 +6,7 @@ export function Sidebar() {
 
   const navItems = [
     { name: 'Home', path: '/dashboard', icon: Home },
+    { name: 'Search', path: '/search', icon: Search },
   ]
 
   return (

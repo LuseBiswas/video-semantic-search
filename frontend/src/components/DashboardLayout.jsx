@@ -1,11 +1,12 @@
 import { Sidebar } from './Sidebar'
 import { useAuth } from '../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 
 export function DashboardLayout({ children }) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleSignOut = async () => {
     try {
@@ -14,6 +15,13 @@ export function DashboardLayout({ children }) {
     } catch (error) {
       console.error('Error signing out:', error)
     }
+  }
+
+  const getPageTitle = () => {
+    const path = location.pathname
+    if (path === '/dashboard') return 'Dashboard'
+    if (path === '/search') return 'Search'
+    return 'Dashboard'
   }
 
   return (
@@ -27,7 +35,7 @@ export function DashboardLayout({ children }) {
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold text-gray-800">
-              Dashboard
+              {getPageTitle()}
             </h1>
             
             <div className="flex items-center gap-4">

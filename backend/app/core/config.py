@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # Model
     MODEL_NAME: str = "ViT-B-32"
     MODEL_PRETRAIN: str = "openai"
-    EMB_DIM: int = 512  # ViT-B-32 default is 512, not 768
+    EMB_DIM: int = 512  # ViT-B-32 produces 512-dim embeddings
     
     # API
     CORS_ORIGINS: str = "http://localhost:3000"

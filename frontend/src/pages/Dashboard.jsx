@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { DashboardLayout } from '../components/DashboardLayout'
@@ -132,11 +132,11 @@ export function Dashboard() {
     }
   }, [])
 
-  const handleDeleteClick = (video) => {
+  const handleDeleteClick = useCallback((video) => {
     setVideoToDelete(video)
     setDeleteModalOpen(true)
     setOpenMenuId(null)
-  }
+  }, [])
 
   const handleDeleteConfirm = async () => {
     if (!videoToDelete) return
@@ -238,6 +238,28 @@ export function Dashboard() {
     })
   }
 
+  const getBentoClass = useCallback((video, index) => {
+    // Calculate aspect ratio
+    const aspectRatio = video.width && video.height ? video.width / video.height : 16/9
+    
+    // Bento box classes based on aspect ratio and position
+    // Landscape videos (wide) get larger
+    if (aspectRatio > 1.5) {
+      return 'md:col-span-2 md:row-span-1'
+    }
+    // Portrait videos (tall) get taller
+    else if (aspectRatio < 0.8) {
+      return 'md:col-span-1 md:row-span-2'
+    }
+    // Square or near-square videos
+    else if (aspectRatio >= 0.8 && aspectRatio <= 1.2) {
+      // Every 3rd square video gets larger for variety
+      return index % 3 === 0 ? 'md:col-span-2 md:row-span-2' : 'md:col-span-1 md:row-span-1'
+    }
+    // Default
+    return 'md:col-span-1 md:row-span-1'
+  }, [])
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -307,9 +329,32 @@ export function Dashboard() {
 
         {/* Videos Grid */}
         {loading ? (
-          <div className="p-12 text-center">
-            <Loader size={32} className="mx-auto text-gray-400 animate-spin mb-3" />
-            <p className="text-sm text-gray-500">Loading videos...</p>
+          <div 
+            className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4"
+            style={{ 
+              gridAutoFlow: 'dense',
+              gridAutoRows: 'minmax(200px, auto)'
+            }}
+          >
+            {/* Skeleton Loaders */}
+            {[...Array(8)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.05, duration: 0.3 }}
+                className={`${i % 3 === 0 ? 'md:col-span-2 md:row-span-2' : i % 5 === 0 ? 'md:col-span-2' : ''}`}
+              >
+                <div className="relative bg-gray-200 rounded-lg overflow-hidden shadow-sm h-full min-h-[200px] animate-pulse">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer" 
+                       style={{ backgroundSize: '200% 100%' }}
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
           </div>
         ) : error ? (
           <div className="p-12 text-center">
@@ -335,15 +380,32 @@ export function Dashboard() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {videos.map((video) => {
+          <div 
+            className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4"
+            style={{ 
+              gridAutoFlow: 'dense',
+              gridAutoRows: 'minmax(200px, auto)'
+            }}
+          >
+            {videos.map((video, index) => {
+              const bentoClass = getBentoClass(video, index)
+              
               return (
-                <div
+                <motion.div
                   key={video.id}
-                  className="group cursor-pointer relative"
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ 
+                    delay: index * 0.05,
+                    duration: 0.4,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  className={`group cursor-pointer relative ${bentoClass} h-full`}
                 >
                   {/* Thumbnail */}
-                  <div className="relative bg-gray-900 aspect-video rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all">
+                  <div 
+                    className="relative bg-gray-900 rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-all w-full h-full"
+                  >
                     {video.thumbnail_url ? (
                       <img 
                         src={video.thumbnail_url} 
@@ -411,7 +473,7 @@ export function Dashboard() {
                       )}
                     </div>
                   </div>
-                </div>
+                </motion.div>
               )
             })}
           </div>

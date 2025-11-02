@@ -7,3 +7,17 @@
   --color-custom-blue-hover: #6fb3aa;
   --color-custom-blue-light: #b0dcd8;
 }
+
+/* Shimmer animation for skeleton loaders */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+}

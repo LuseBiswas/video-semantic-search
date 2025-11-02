@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { DashboardLayout } from '../components/DashboardLayout'
 import { UploadModal } from '../components/UploadModal'
@@ -242,37 +243,66 @@ export function Dashboard() {
       <div className="space-y-6">
         {/* Header with Greeting and Search */}
         <div className="flex items-center gap-6">
-          <h2 className="text-2xl font-bold text-gray-900 whitespace-nowrap">
-            Hey, {userProfile?.full_name || 'there'}! 👋
-          </h2>
+          {/* Animated Greeting */}
+          <AnimatePresence mode="wait">
+            {!searchQuery && (
+              <motion.h2
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.4, ease: "easeInOut" }}
+                className="text-2xl font-bold text-gray-900 whitespace-nowrap overflow-hidden"
+              >
+                Hey, {userProfile?.full_name || 'there'}! 👋
+              </motion.h2>
+            )}
+          </AnimatePresence>
 
-          {/* Search Bar */}
-          <form onSubmit={handleSearch} className="flex-1">
-            <div className="flex items-center border-b-2 border-gray-300 focus-within:border-custom-blue transition-colors pb-2">
-              <Search size={20} className="text-gray-400 mr-3" />
+          {/* Animated Search Bar */}
+          <motion.form
+            onSubmit={handleSearch}
+            layout
+            transition={{ duration: 0.4, ease: "easeInOut" }}
+            className="flex-1 min-w-0"
+          >
+            <motion.div
+              layout
+              className="flex items-center border-b-2 border-gray-300 focus-within:border-custom-blue pb-2"
+              style={{ transition: "border-color 0.2s" }}
+            >
+              <Search size={20} className="text-gray-400 mr-3 flex-shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search your videos by content... (e.g., 'sunset', 'dog playing')"
-                className="flex-1 outline-none text-gray-900 placeholder-gray-400 bg-transparent"
+                className="flex-1 outline-none text-gray-900 placeholder-gray-400 bg-transparent min-w-0"
                 disabled={searching}
               />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  className="ml-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                  title="Clear search"
-                >
-                  <X size={16} />
-                </button>
-              )}
+              
+              {/* Animated Clear Button */}
+              <AnimatePresence>
+                {searchQuery && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.2 }}
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="ml-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+                    title="Clear search"
+                  >
+                    <X size={16} />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              
               {searching && (
-                <Loader size={18} className="ml-2 text-gray-400 animate-spin" />
+                <Loader size={18} className="ml-2 text-gray-400 animate-spin flex-shrink-0" />
               )}
-            </div>
-          </form>
+            </motion.div>
+          </motion.form>
         </div>
 
         {/* Videos Grid */}

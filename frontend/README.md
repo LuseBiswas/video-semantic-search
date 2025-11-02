@@ -1,16 +1,96 @@
-# React + Vite
+# Video Semantic Search - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite + Tailwind CSS frontend for semantic video search.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. Install Dependencies
 
-## React Compiler
+```bash
+npm install
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 2. Configure Environment
 
-## Expanding the ESLint configuration
+Create `.env` file:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```env
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGc...
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+Get your Supabase credentials from:
+- Dashboard → Settings → API
+- Copy `Project URL` and `anon public` key
+
+### 3. Start Development Server
+
+```bash
+npm run dev
+```
+
+Open http://localhost:5173
+
+## Features
+
+- ✅ User authentication (Supabase Auth)
+- ✅ Protected routes
+- ✅ API client for backend
+- 🚧 Video upload (TODO)
+- 🚧 Search interface (TODO)
+- 🚧 Video player (TODO)
+
+## Project Structure
+
+```
+src/
+├── components/          # Reusable components
+│   └── ProtectedRoute.jsx
+├── contexts/            # React contexts
+│   └── AuthContext.jsx
+├── lib/                 # Utilities
+│   ├── supabase.js      # Supabase client
+│   └── api.js           # Backend API client
+├── pages/               # Page components
+│   ├── Login.jsx
+│   ├── Signup.jsx
+│   └── Dashboard.jsx
+├── App.jsx              # Main app with routing
+└── main.jsx             # Entry point
+```
+
+## Available Scripts
+
+- `npm run dev` - Start dev server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+
+## Backend Connection
+
+The frontend connects to the FastAPI backend at `http://localhost:8000`.
+
+Make sure the backend is running:
+
+```bash
+cd ../backend
+uvicorn app.main:app --reload
+```
+
+## Next Steps
+
+1. Create video upload interface
+2. Build search UI with query input
+3. Display search results with thumbnails
+4. Add video player with seek-to-timestamp
+5. Polish UI/UX
+
+## Tech Stack
+
+- React 19
+- Vite 7
+- Tailwind CSS 4
+- React Router 6
+- Supabase Auth
+- Fetch API for backend calls

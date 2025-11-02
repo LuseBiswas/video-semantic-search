@@ -29,6 +29,7 @@ class VideoResponse(BaseModel):
     status: str
     error_msg: Optional[str] = None
     created_at: str
+    thumbnail_url: Optional[str] = None
 
 
 class UploadResponse(BaseModel):
@@ -134,6 +135,18 @@ def get_video_details(video_id: str, user_id: str):
     if str(video['user_id']) != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    # Generate signed URL for thumbnail if it exists
+    thumbnail_url = None
+    if video.get('thumbnail_url'):
+        try:
+            # Split bucket and path: "frames/user_id/video_id/thumbnail.jpg" -> bucket="frames", path="user_id/video_id/thumbnail.jpg"
+            parts = video['thumbnail_url'].split('/', 1)
+            if len(parts) == 2:
+                bucket, path = parts
+                thumbnail_url = get_signed_url(bucket, path, expires_in=3600)
+        except Exception as e:
+            print(f"Failed to generate signed URL for thumbnail: {e}")
+    
     return VideoResponse(
         id=str(video['id']),
         user_id=str(video['user_id']),
@@ -143,7 +156,8 @@ def get_video_details(video_id: str, user_id: str):
         height=video['height'],
         status=video['status'],
         error_msg=video['error_msg'],
-        created_at=video['created_at'].isoformat() if video['created_at'] else None
+        created_at=video['created_at'].isoformat() if video['created_at'] else None,
+        thumbnail_url=thumbnail_url
     )
 
 
@@ -162,7 +176,7 @@ def list_videos(user_id: str, limit: int = 50):
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, user_id, url, duration_ms, width, height, status, error_msg, created_at
+                SELECT id, user_id, url, duration_ms, width, height, status, error_msg, created_at, thumbnail_url
                 FROM public.videos
                 WHERE user_id = %s
                 ORDER BY created_at DESC
@@ -173,6 +187,18 @@ def list_videos(user_id: str, limit: int = 50):
             
             videos = []
             for row in rows:
+                # Generate signed URL for thumbnail if it exists
+                thumbnail_url = None
+                if row[9]:  # thumbnail_url from DB (format: "frames/user_id/video_id/thumbnail.jpg")
+                    try:
+                        # Split bucket and path: "frames/user_id/video_id/thumbnail.jpg" -> bucket="frames", path="user_id/video_id/thumbnail.jpg"
+                        parts = row[9].split('/', 1)
+                        if len(parts) == 2:
+                            bucket, path = parts
+                            thumbnail_url = get_signed_url(bucket, path, expires_in=3600)
+                    except Exception as e:
+                        print(f"Failed to generate signed URL for thumbnail: {e}")
+                
                 videos.append(VideoResponse(
                     id=str(row[0]),
                     user_id=str(row[1]),
@@ -182,8 +208,41 @@ def list_videos(user_id: str, limit: int = 50):
                     height=row[5],
                     status=row[6],
                     error_msg=row[7],
-                    created_at=row[8].isoformat() if row[8] else None
+                    created_at=row[8].isoformat() if row[8] else None,
+                    thumbnail_url=thumbnail_url
                 ))
             
             return videos
+
+
+@router.delete("/{video_id}")
+def delete_video(video_id: str, user_id: str):
+    """
+    Delete video and all associated data.
+    
+    Args:
+        video_id: Video UUID
+        user_id: User UUID (for ownership verification)
+    
+    Returns:
+        Success message
+    """
+    # Verify ownership
+    video = get_video(video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    
+    if str(video['user_id']) != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Delete from database (cascade will delete segments)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM public.videos
+                WHERE id = %s
+            """, (video_id,))
+            conn.commit()
+    
+    return {"message": "Video deleted successfully", "video_id": video_id}
 

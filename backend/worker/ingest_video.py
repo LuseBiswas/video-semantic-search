@@ -132,8 +132,35 @@ def ingest_video(
         timestamp_buffer = []
         frames_extracted = 0
         segments_inserted = 0
+        first_frame_uploaded = False
         
         for timestamp_ms, frame_image in extract_frames(video_path, fps=fps):
+            # Upload first frame as thumbnail
+            if not first_frame_uploaded:
+                print("   📸 Generating thumbnail from first frame...")
+                thumbnail_path = f"{user_id}/{video_id}/thumbnail.jpg"
+                upload_frame(
+                    settings.BUCKET_FRAMES,
+                    thumbnail_path,
+                    frame_image,
+                    quality=90
+                )
+                thumbnail_url = f"{settings.BUCKET_FRAMES}/{thumbnail_path}"
+                
+                # Update video record with thumbnail
+                insert_video(
+                    video_id=video_id,
+                    user_id=user_id,
+                    url=video_url,
+                    duration_ms=duration_ms,
+                    width=width,
+                    height=height,
+                    status="processing",
+                    thumbnail_url=thumbnail_url
+                )
+                print(f"   ✅ Thumbnail uploaded: {thumbnail_path}")
+                first_frame_uploaded = True
+            
             frame_buffer.append(frame_image)
             timestamp_buffer.append(timestamp_ms)
             frames_extracted += 1

@@ -147,7 +147,8 @@ def insert_video(
     width: Optional[int] = None,
     height: Optional[int] = None,
     status: str = "processing",
-    error_msg: Optional[str] = None
+    error_msg: Optional[str] = None,
+    thumbnail_url: Optional[str] = None
 ) -> None:
     """
     Insert or update video record in database.
@@ -161,22 +162,24 @@ def insert_video(
         height: Video height
         status: Status (processing, completed, failed)
         error_msg: Error message if failed
+        thumbnail_url: Thumbnail URL
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO public.videos (
-                    id, user_id, url, duration_ms, width, height, status, error_msg
+                    id, user_id, url, duration_ms, width, height, status, error_msg, thumbnail_url
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) 
                 DO UPDATE SET
                     duration_ms = EXCLUDED.duration_ms,
                     width = EXCLUDED.width,
                     height = EXCLUDED.height,
                     status = EXCLUDED.status,
-                    error_msg = EXCLUDED.error_msg
-            """, (video_id, user_id, url, duration_ms, width, height, status, error_msg))
+                    error_msg = EXCLUDED.error_msg,
+                    thumbnail_url = EXCLUDED.thumbnail_url
+            """, (video_id, user_id, url, duration_ms, width, height, status, error_msg, thumbnail_url))
             conn.commit()
 
 
@@ -254,7 +257,7 @@ def get_video(video_id: str) -> Optional[dict]:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, user_id, url, duration_ms, width, height, status, error_msg, created_at
+                SELECT id, user_id, url, duration_ms, width, height, status, error_msg, created_at, thumbnail_url
                 FROM public.videos
                 WHERE id = %s
             """, (video_id,))
@@ -270,7 +273,8 @@ def get_video(video_id: str) -> Optional[dict]:
                     'height': row[5],
                     'status': row[6],
                     'error_msg': row[7],
-                    'created_at': row[8]
+                    'created_at': row[8],
+                    'thumbnail_url': row[9]
                 }
             return None
 

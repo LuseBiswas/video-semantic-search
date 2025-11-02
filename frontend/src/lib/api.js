@@ -82,3 +82,21 @@ export async function searchVideos(query, userId, topK = 20, minScore = 0, seman
   return response.json()
 }
 
+/**
+ * Delete video
+ */
+export async function deleteVideo(videoId, userId) {
+  const response = await fetch(
+    `${API_BASE}/v1/videos/${videoId}?user_id=${userId}`,
+    {
+      method: 'DELETE',
+    }
+  )
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.detail || 'Failed to delete video')
+  }
+
+  return response.json()
+}

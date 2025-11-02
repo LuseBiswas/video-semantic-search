@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { DashboardLayout } from '../components/DashboardLayout'
 import { UploadModal } from '../components/UploadModal'
-import { listVideos, deleteVideo } from '../lib/api'
+import { listVideos, deleteVideo, getVideo } from '../lib/api'
 import { Upload, Video, Clock, CheckCircle, AlertCircle, Loader, RefreshCw, MoreVertical, Trash2 } from 'lucide-react'
 
 export function Dashboard() {
@@ -15,14 +15,19 @@ export function Dashboard() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [videoToDelete, setVideoToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [processingVideos, setProcessingVideos] = useState([])
+  const [progress, setProgress] = useState(0)
   const menuRef = useRef(null)
+  const pollIntervalRef = useRef(null)
 
   const fetchVideos = async () => {
     try {
       setLoading(true)
       setError('')
       const data = await listVideos(user.id)
-      setVideos(data)
+      // Only show videos with status "ready"
+      const readyVideos = data.filter(video => video.status === 'ready')
+      setVideos(readyVideos)
     } catch (err) {
       setError(err.message)
       console.error('Error fetching videos:', err)
@@ -37,9 +42,73 @@ export function Dashboard() {
     }
   }, [user?.id])
 
-  const handleUploadSuccess = () => {
-    fetchVideos() // Refresh video list
+  const handleUploadSuccess = (videoId) => {
+    // Add to processing list
+    setProcessingVideos(prev => [...prev, videoId])
+    setProgress(0)
+    
+    // Start polling for progress
+    startProgressPolling(videoId)
   }
+
+  const startProgressPolling = (videoId) => {
+    // Clear any existing interval
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+    }
+
+    // Poll every 3 seconds
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const video = await getVideo(videoId, user.id)
+        
+        // Calculate progress based on status
+        if (video.status === 'uploaded') {
+          setProgress(10)
+        } else if (video.status === 'processing') {
+          // Increment progress gradually (10% to 90%)
+          setProgress(prev => Math.min(prev + 5, 90))
+        } else if (video.status === 'ready') {
+          setProgress(100)
+          
+          // Wait a bit to show 100%, then cleanup
+          setTimeout(() => {
+            setProcessingVideos(prev => prev.filter(id => id !== videoId))
+            setProgress(0)
+            fetchVideos() // Refresh to show the new video
+            
+            // Clear interval
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current)
+              pollIntervalRef.current = null
+            }
+          }, 1000)
+        } else if (video.status === 'error') {
+          // Handle error
+          setProcessingVideos(prev => prev.filter(id => id !== videoId))
+          setProgress(0)
+          alert('Video processing failed. Please try again.')
+          
+          // Clear interval
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current)
+            pollIntervalRef.current = null
+          }
+        }
+      } catch (err) {
+        console.error('Error polling video status:', err)
+      }
+    }, 3000)
+  }
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
+    }
+  }, [])
 
   const handleDeleteClick = (video) => {
     setVideoToDelete(video)
@@ -117,7 +186,7 @@ export function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header with Upload Button */}
+        {/* Header with Refresh Button */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -127,30 +196,18 @@ export function Dashboard() {
               {videos.length} video{videos.length !== 1 ? 's' : ''} uploaded
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={fetchVideos}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-3 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
-              style={{ backgroundColor: 'white' }}
-              onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = '#e9ecef')}
-              onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = 'white')}
-              title="Refresh video list"
-            >
-              <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-medium transition-colors shadow-sm"
-              style={{ backgroundColor: '#83c5be' }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6fb3aa'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#83c5be'}
-            >
-              <Upload size={20} />
-              Upload Video
-            </button>
-          </div>
+          <button
+            onClick={fetchVideos}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-3 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300"
+            style={{ backgroundColor: 'white' }}
+            onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = '#e9ecef')}
+            onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = 'white')}
+            title="Refresh video list"
+          >
+            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
         </div>
 
         {/* Videos Grid */}
@@ -264,6 +321,59 @@ export function Dashboard() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Floating Upload Button with Progress */}
+      <div className="fixed bottom-8 right-8 z-40">
+        {/* Circular Progress Ring */}
+        {processingVideos.length > 0 && (
+          <svg className="absolute inset-0 w-20 h-20 -m-2 transform -rotate-90">
+            <circle
+              cx="40"
+              cy="40"
+              r="36"
+              stroke="#e5e7eb"
+              strokeWidth="4"
+              fill="none"
+            />
+            <circle
+              cx="40"
+              cy="40"
+              r="36"
+              stroke="#83c5be"
+              strokeWidth="4"
+              fill="none"
+              strokeDasharray={`${2 * Math.PI * 36}`}
+              strokeDashoffset={`${2 * Math.PI * 36 * (1 - progress / 100)}`}
+              strokeLinecap="round"
+              style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+            />
+          </svg>
+        )}
+        
+        {/* Upload Button */}
+        <button
+          onClick={() => setIsUploadModalOpen(true)}
+          disabled={processingVideos.length > 0}
+          className="relative w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 hover:shadow-3xl disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+          style={{ backgroundColor: '#83c5be' }}
+          onMouseEnter={(e) => {
+            if (processingVideos.length === 0) e.currentTarget.style.backgroundColor = '#6fb3aa'
+          }}
+          onMouseLeave={(e) => {
+            if (processingVideos.length === 0) e.currentTarget.style.backgroundColor = '#83c5be'
+          }}
+          title={processingVideos.length > 0 ? `Processing video... ${progress}%` : 'Upload Video'}
+        >
+          {processingVideos.length > 0 ? (
+            <div className="flex flex-col items-center">
+              <Loader size={20} className="text-white animate-spin" />
+              <span className="text-white text-xs mt-1 font-medium">{progress}%</span>
+            </div>
+          ) : (
+            <Upload size={24} className="text-white" />
+          )}
+        </button>
       </div>
 
       {/* Upload Modal */}

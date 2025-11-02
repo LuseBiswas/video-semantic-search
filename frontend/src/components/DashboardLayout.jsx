@@ -8,6 +8,7 @@ export function DashboardLayout({ children }) {
     const path = location.pathname
     if (path === '/dashboard') return 'Dashboard'
     if (path === '/search') return 'Search'
+    if (path === '/profile') return 'Profile'
     return 'Dashboard'
   }
 

@@ -17,9 +17,9 @@ export function DashboardLayout({ children }) {
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
         {/* Top Header */}
-        <header className="border-b border-gray-200 px-6 py-4" style={{ backgroundColor: '#f8f9fa' }}>
+        <header className="border-b border-gray-200 px-6 py-4 bg-white" >
           <h1 className="text-xl font-semibold text-gray-800">
             {getPageTitle()}
           </h1>

@@ -68,13 +68,13 @@ export function Sidebar() {
 
   return (
     <div className="w-64 h-screen flex flex-col" style={{ backgroundColor: '#f8f9fa' }}>
-      {/* Logo Section */}
-      <div className="p-6 flex items-center justify-between border-b border-gray-200">
+      {/* Logo Section - Same height as header */}
+      <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm text-white" style={{ backgroundColor: '#83c5be' }}>
             VS
           </div>
-          <span className="font-semibold text-lg text-gray-900">VideoSearch</span>
+          <span className="font-semibold text-xl text-gray-900">VideoSearch</span>
         </div>
         <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600">
           <Box size={20} />

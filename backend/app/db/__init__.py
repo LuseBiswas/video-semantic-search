@@ -20,10 +20,14 @@ def get_pool() -> psycopg_pool.ConnectionPool:
     if _pool is None:
         _pool = psycopg_pool.ConnectionPool(
             settings.DATABASE_URL,
-            min_size=2,
-            max_size=10,
-            timeout=30.0
+            min_size=1,
+            max_size=3,  # Conservative for Supabase free tier (limit is ~10 total)
+            timeout=30.0,  # Increased timeout for slow connections
+            max_waiting=20,
+            max_lifetime=300,  # Recycle connections after 5 minutes
+            max_idle=60  # Close idle connections after 1 minute
         )
+        print(f"✅ Database connection pool created (min=1, max=3)")
     
     return _pool
 

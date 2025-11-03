@@ -53,7 +53,7 @@ export function Home() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           <button
             onClick={() => setShowLoginModal(true)}
-            className="px-8 py-4 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+            className="px-8 py-4 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all hover:cursor-pointer"
             style={{ backgroundColor: '#83c5be' }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6fb3aa'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#83c5be'}
@@ -63,7 +63,7 @@ export function Home() {
 
           <button
             onClick={() => setShowSignupModal(true)}
-            className="px-8 py-4 bg-white text-gray-900 rounded-xl font-semibold text-lg border-2 hover:shadow-lg transform hover:scale-105 transition-all"
+            className="px-8 py-4 bg-white text-gray-900 rounded-xl font-semibold text-lg border-2 hover:shadow-lg transform hover:scale-105 transition-all hover:cursor-pointer"
             style={{ borderColor: '#83c5be' }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#b0dcd8'

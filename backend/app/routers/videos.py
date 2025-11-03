@@ -8,7 +8,6 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from pydantic import BaseModel
 from typing import Optional, List
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.db import get_connection
 from worker.ingest_video import ingest_video
@@ -231,7 +230,7 @@ def _generate_signed_urls_for_video(row: tuple) -> dict:
 def list_videos(user_id: str, limit: int = 50):
     """
     List all videos for a user.
-    Uses parallel execution for signed URL generation.
+    Uses sequential signed URL generation (optimized for Supabase connection limits).
     
     Args:
         user_id: User UUID
@@ -240,6 +239,8 @@ def list_videos(user_id: str, limit: int = 50):
     Returns:
         List of VideoResponse
     """
+    # Step 1: Get data from database and close connection immediately
+    rows = []
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -251,37 +252,23 @@ def list_videos(user_id: str, limit: int = 50):
             """, (user_id, limit))
             
             rows = cur.fetchall()
-            
-            if not rows:
-                return []
-            
-            # Generate signed URLs in parallel
-            videos = []
-            with ThreadPoolExecutor(max_workers=20) as executor:
-                # Submit all tasks
-                future_to_row = {
-                    executor.submit(_generate_signed_urls_for_video, row): idx
-                    for idx, row in enumerate(rows)
-                }
-                
-                # Collect results as they complete
-                results = []
-                for future in as_completed(future_to_row):
-                    try:
-                        result = future.result()
-                        idx = future_to_row[future]
-                        results.append((idx, result))
-                    except Exception as e:
-                        print(f"Error generating signed URLs: {e}")
-                
-                # Sort by original order
-                results.sort(key=lambda x: x[0])
-                
-                # Build response
-                for _, video_data in results:
-                    videos.append(VideoResponse(**video_data))
-            
-            return videos
+    # Connection is now closed
+    
+    if not rows:
+        return []
+    
+    # Step 2: Generate signed URLs sequentially (simpler, avoids threading issues)
+    videos = []
+    for row in rows:
+        try:
+            video_data = _generate_signed_urls_for_video(row)
+            videos.append(VideoResponse(**video_data))
+        except Exception as e:
+            print(f"Error generating signed URLs for video: {e}")
+            # Skip this video if URL generation fails
+            continue
+    
+    return videos
 
 
 @router.delete("/{video_id}")
